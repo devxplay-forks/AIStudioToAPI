@@ -20,6 +20,7 @@ const AuthSource = require("../auth/AuthSource");
 const BrowserManager = require("./BrowserManager");
 const ConnectionRegistry = require("./ConnectionRegistry");
 const RequestHandler = require("./RequestHandler");
+const StateService = require("./StateService");
 const UsageStatsService = require("./UsageStatsService");
 const ConfigLoader = require("../utils/ConfigLoader");
 const WebRoutes = require("../routes/WebRoutes");
@@ -41,7 +42,9 @@ class ProxyServerSystem extends EventEmitter {
         this.forceUrlContext = this.config.forceUrlContext;
 
         this.authSource = new AuthSource(this.logger);
-        this.browserManager = new BrowserManager(this.logger, this.config, this.authSource);
+        const dataDir = path.join(process.cwd(), "data");
+        this.stateService = new StateService(this.logger, dataDir);
+        this.browserManager = new BrowserManager(this.logger, this.config, this.authSource, this.stateService);
         this.usageStatsService = new UsageStatsService(
             this.authSource,
             this.logger,
@@ -164,9 +167,29 @@ class ProxyServerSystem extends EventEmitter {
                 );
             }
         } else {
-            this.logger.info(
-                `[System] No valid startup index specified, will activate first available context [${startupOrder[0]}].`
-            );
+            const savedLastAuthIndex = this.stateService.getLastAuthIndex();
+            const canonicalSavedIndex =
+                savedLastAuthIndex !== null ? this.authSource.getCanonicalIndex(savedLastAuthIndex) : null;
+            if (canonicalSavedIndex !== null && startupOrder.includes(canonicalSavedIndex)) {
+                startupOrder = [canonicalSavedIndex, ...startupOrder.filter(i => i !== canonicalSavedIndex)];
+                if (canonicalSavedIndex !== savedLastAuthIndex) {
+                    this.logger.warn(
+                        `[System] Last used account #${savedLastAuthIndex} is a duplicate, resuming from latest auth index #${canonicalSavedIndex}.`
+                    );
+                } else {
+                    this.logger.info(
+                        `[System] No startup index specified, resuming from last used account #${savedLastAuthIndex}.`
+                    );
+                }
+            } else if (savedLastAuthIndex !== null) {
+                this.logger.info(
+                    `[System] Last used account #${savedLastAuthIndex} is no longer available for startup, starting from first available context.`
+                );
+            } else {
+                this.logger.info(
+                    `[System] No valid startup index specified, will activate first available context [${startupOrder[0]}].`
+                );
+            }
         }
 
         // Context pool startup

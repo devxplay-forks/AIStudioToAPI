@@ -25,10 +25,11 @@ const WS_INIT_TIMEOUT_MS = 120000;
  * Responsible for launching, managing, and switching browser contexts
  */
 class BrowserManager {
-    constructor(logger, config, authSource) {
+    constructor(logger, config, authSource, stateService = null) {
         this.logger = logger;
         this.config = config;
         this.authSource = authSource;
+        this.stateService = stateService;
         this.browser = null;
 
         // Multi-context architecture: Store all initialized contexts
@@ -141,6 +142,9 @@ class BrowserManager {
 
     set currentAuthIndex(value) {
         this._currentAuthIndex = value;
+        if (this.stateService && value >= 0) {
+            this.stateService.setLastAuthIndex(value);
+        }
     }
 
     /**
@@ -595,7 +599,7 @@ class BrowserManager {
     _activateContext(ctx, pg, authIndex) {
         this.context = ctx;
         this.page = pg;
-        this._currentAuthIndex = authIndex;
+        this.currentAuthIndex = authIndex;
         this.noButtonCount = 0;
         this._startHealthMonitor();
         this._startBackgroundWakeup();

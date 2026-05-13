@@ -12,11 +12,33 @@ require("dotenv").config({ path: path.resolve(__dirname, envFile) });
 
 const ProxyServerSystem = require("./src/core/ProxyServerSystem");
 
+const parseInitialAuthIndex = rawValue => {
+    if (typeof rawValue !== "string" || rawValue.trim() === "") {
+        return null;
+    }
+
+    const trimmedValue = rawValue.trim();
+    if (!/^\d+$/.test(trimmedValue)) {
+        console.warn(`[Config] Ignoring invalid INITIAL_AUTH_INDEX="${rawValue}". Expected a non-negative integer.`);
+        return null;
+    }
+
+    const parsedValue = Number(trimmedValue);
+    if (!Number.isSafeInteger(parsedValue)) {
+        console.warn(
+            `[Config] Ignoring invalid INITIAL_AUTH_INDEX="${rawValue}". Expected a safe non-negative integer.`
+        );
+        return null;
+    }
+
+    return parsedValue;
+};
+
 /**
  * Initialize and start the server
  */
 const initializeServer = async () => {
-    const initialAuthIndex = parseInt(process.env.INITIAL_AUTH_INDEX, 10) || null;
+    const initialAuthIndex = parseInitialAuthIndex(process.env.INITIAL_AUTH_INDEX);
 
     try {
         const serverSystem = new ProxyServerSystem();
@@ -47,4 +69,4 @@ if (require.main === module) {
     initializeServer();
 }
 
-module.exports = { initializeServer, ProxyServerSystem };
+module.exports = { initializeServer, parseInitialAuthIndex, ProxyServerSystem };
